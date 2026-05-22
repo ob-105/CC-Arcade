@@ -46,6 +46,8 @@ The installer will:
 - Write `/startup` to auto-update from GitHub, then run that machine's main program
 - Offer reboot so startup immediately applies
 
+If the installer is run from a temporary HTTP path (for example `wget run ...`), it now auto-falls back to downloading required files directly from GitHub.
+
 This startup behavior keeps machines persistent across chunk unload/reload, because ComputerCraft reruns startup on boot.
 
 ## Auto Update Behavior
@@ -61,6 +63,14 @@ Updater behavior:
 Important:
 - ComputerCraft HTTP API must be enabled in server config for updates to work.
 - Token file `/arcade_token.txt` is not overwritten by updater.
+
+## Troubleshooting Installer Source Errors
+
+If you saw warnings like `Missing source: rom/programs/http/...`, that means installer was launched from an HTTP temp path without local project files next to it.
+
+Use either approach:
+- Run installer from a full local project copy
+- Or keep using `wget run` with HTTP enabled, and installer will fetch needed files from GitHub automatically
 
 ## 1) Wire the Network
 

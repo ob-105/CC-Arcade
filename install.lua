@@ -1,4 +1,12 @@
 local INSTALLER_TITLE = "CC Arcade Installer"
+local REPO_RAW_BASE = "https://raw.githubusercontent.com/ob-105/CC-Arcade/main/"
+
+local sharedFiles = {
+    "shared/protocol.lua",
+    "shared/security.lua",
+    "shared/net.lua",
+    "shared/updater.lua",
+}
 
 local roles = {
     {
@@ -6,10 +14,9 @@ local roles = {
         id = "server",
         name = "Central Server",
         startupProgram = "/server/main.lua",
-        paths = {
-            { src = "shared", dst = "/shared" },
-            { src = "server", dst = "/server" },
-            { src = "arcade_token.example.txt", dst = "/arcade_token.example.txt" },
+        roleFiles = {
+            "server/main.lua",
+            "arcade_token.example.txt",
         },
     },
     {
@@ -17,10 +24,9 @@ local roles = {
         id = "frontdesk",
         name = "Front Desk Admin",
         startupProgram = "/frontdesk/main.lua",
-        paths = {
-            { src = "shared", dst = "/shared" },
-            { src = "frontdesk", dst = "/frontdesk" },
-            { src = "arcade_token.example.txt", dst = "/arcade_token.example.txt" },
+        roleFiles = {
+            "frontdesk/main.lua",
+            "arcade_token.example.txt",
         },
     },
     {
@@ -28,10 +34,9 @@ local roles = {
         id = "kiosk",
         name = "Balance Checker Kiosk",
         startupProgram = "/kiosk/main.lua",
-        paths = {
-            { src = "shared", dst = "/shared" },
-            { src = "kiosk", dst = "/kiosk" },
-            { src = "arcade_token.example.txt", dst = "/arcade_token.example.txt" },
+        roleFiles = {
+            "kiosk/main.lua",
+            "arcade_token.example.txt",
         },
     },
     {
@@ -39,10 +44,9 @@ local roles = {
         id = "game",
         name = "Game Cabinet Client",
         startupProgram = "/game/main.lua",
-        paths = {
-            { src = "shared", dst = "/shared" },
-            { src = "game", dst = "/game" },
-            { src = "arcade_token.example.txt", dst = "/arcade_token.example.txt" },
+        roleFiles = {
+            "game/main.lua",
+            "arcade_token.example.txt",
         },
     },
 }
@@ -71,9 +75,14 @@ local function listDir(path)
 end
 
 local function ensureDir(path)
-    if not fs.exists(path) then
+    if path and path ~= "" and not fs.exists(path) then
         fs.makeDir(path)
     end
+end
+
+local function ensureParentDir(path)
+    local dir = fs.getDir(path)
+    ensureDir(dir)
 end
 
 local function nextBackupPath(basePath)
@@ -89,43 +98,91 @@ local function nextBackupPath(basePath)
     return basePath .. "." .. tostring(n)
 end
 
-local function copyPath(src, dst, overwrite)
-    if not fs.exists(src) then
-        return 0, 1, { "Missing source: " .. src }
+local function combineFiles(role)
+    local files = {}
+
+    for _, path in ipairs(sharedFiles) do
+        table.insert(files, path)
     end
 
-    local copied = 0
-    local skipped = 0
-    local errors = {}
-
-    local function copyRecursive(fromPath, toPath)
-        if fs.isDir(fromPath) then
-            ensureDir(toPath)
-            for _, name in ipairs(listDir(fromPath)) do
-                copyRecursive(fs.combine(fromPath, name), fs.combine(toPath, name))
-            end
-            return
-        end
-
-        if fs.exists(toPath) then
-            if overwrite then
-                fs.delete(toPath)
-            else
-                skipped = skipped + 1
-                return
-            end
-        end
-
-        local ok, err = pcall(fs.copy, fromPath, toPath)
-        if ok then
-            copied = copied + 1
-        else
-            table.insert(errors, "Copy failed: " .. fromPath .. " -> " .. toPath .. " (" .. tostring(err) .. ")")
-        end
+    for _, path in ipairs(role.roleFiles) do
+        table.insert(files, path)
     end
 
-    copyRecursive(src, dst)
-    return copied, skipped, errors
+    return files
+end
+
+local function hasLocalSources(sourceRoot, files)
+    for _, relative in ipairs(files) do
+        if not fs.exists(fs.combine(sourceRoot, relative)) then
+            return false
+        end
+    end
+    return true
+end
+
+local function installFileFromLocal(sourceRoot, relativePath, overwrite)
+    local srcPath = fs.combine(sourceRoot, relativePath)
+    local dstPath = "/" .. relativePath
+
+    if not fs.exists(srcPath) then
+        return false, false, "Missing source: " .. srcPath
+    end
+
+    if fs.exists(dstPath) and not overwrite then
+        return true, true, nil
+    end
+
+    if fs.exists(dstPath) and overwrite then
+        fs.delete(dstPath)
+    end
+
+    ensureParentDir(dstPath)
+
+    local ok, err = pcall(fs.copy, srcPath, dstPath)
+    if not ok then
+        return false, false, "Copy failed: " .. srcPath .. " -> " .. dstPath .. " (" .. tostring(err) .. ")"
+    end
+
+    return true, false, nil
+end
+
+local function installFileFromRemote(relativePath, overwrite)
+    if not http then
+        return false, false, "HTTP API unavailable"
+    end
+
+    local dstPath = "/" .. relativePath
+    if fs.exists(dstPath) and not overwrite then
+        return true, true, nil
+    end
+
+    local url = REPO_RAW_BASE .. relativePath
+    local response, err = http.get(url)
+    if not response then
+        return false, false, "Download failed: " .. relativePath .. " (" .. tostring(err) .. ")"
+    end
+
+    local body = response.readAll()
+    response.close()
+    if not body or body == "" then
+        return false, false, "Empty download: " .. relativePath
+    end
+
+    if fs.exists(dstPath) and overwrite then
+        fs.delete(dstPath)
+    end
+
+    ensureParentDir(dstPath)
+
+    local file = fs.open(dstPath, "w")
+    if not file then
+        return false, false, "Write failed: " .. dstPath
+    end
+
+    file.write(body)
+    file.close()
+    return true, false, nil
 end
 
 local function writeTokenIfMissing()
@@ -237,6 +294,19 @@ local function runInstall()
     print("Source root: " .. sourceRoot)
 
     local overwrite = confirm("Overwrite existing installed files?", true)
+    local files = combineFiles(role)
+    local useLocalSources = hasLocalSources(sourceRoot, files)
+
+    if useLocalSources then
+        print("Install mode: local files")
+    else
+        print("Install mode: GitHub download fallback")
+        if not http then
+            print("ERROR: HTTP API is disabled, and local files are missing.")
+            print("Enable HTTP API or run installer from a full local copy.")
+            return
+        end
+    end
 
     print("")
     print("Installing files...")
@@ -245,19 +315,24 @@ local function runInstall()
     local totalSkipped = 0
     local allErrors = {}
 
-    for _, map in ipairs(role.paths) do
-        local src = fs.combine(sourceRoot, map.src)
-        local dst = map.dst
-        local copied, skipped, errors = copyPath(src, dst, overwrite)
-
-        totalCopied = totalCopied + copied
-        totalSkipped = totalSkipped + skipped
-
-        for _, err in ipairs(errors) do
-            table.insert(allErrors, err)
+    for _, relativePath in ipairs(files) do
+        local ok, skipped, err
+        if useLocalSources then
+            ok, skipped, err = installFileFromLocal(sourceRoot, relativePath, overwrite)
+        else
+            ok, skipped, err = installFileFromRemote(relativePath, overwrite)
         end
 
-        print("- " .. map.src .. " -> " .. map.dst .. " (copied " .. tostring(copied) .. ", skipped " .. tostring(skipped) .. ")")
+        if ok and skipped then
+            totalSkipped = totalSkipped + 1
+        elseif ok then
+            totalCopied = totalCopied + 1
+        else
+            table.insert(allErrors, err or ("Install failed for " .. relativePath))
+        end
+
+        local status = ok and (skipped and "skipped" or "installed") or "error"
+        print("- " .. relativePath .. " (" .. status .. ")")
     end
 
     local tokenCreated = writeTokenIfMissing()
@@ -269,7 +344,7 @@ local function runInstall()
 
     print("")
     print("Install complete")
-    print("Copied files: " .. tostring(totalCopied))
+    print("Installed files: " .. tostring(totalCopied))
     print("Skipped files: " .. tostring(totalSkipped))
 
     if tokenCreated then
