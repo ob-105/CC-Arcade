@@ -72,6 +72,26 @@ Use either approach:
 - Run installer from a full local project copy
 - Or keep using `wget run` with HTTP enabled, and installer will fetch needed files from GitHub automatically
 
+## Troubleshooting Startup Errors
+
+If boot shows:
+- `[startup] updater not available`
+- `No such program`
+
+Then startup was written before required files were installed.
+
+Fix on that machine:
+1. Run installer again using latest version:
+
+```lua
+shell.run("/install.lua")
+```
+
+2. Pick the role again and allow overwrite.
+3. Reboot.
+
+Latest startup now includes bootstrap logic that downloads missing updater and role program files automatically when possible.
+
 ## 1) Wire the Network
 
 Use wired modems only.
