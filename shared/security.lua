@@ -6,6 +6,7 @@ local rolePermissions = {
     admin = {
         ["auth.login"] = true,
         ["player.lookup"] = true,
+        ["player.list"] = true,
         ["player.create"] = true,
         ["player.rename"] = true,
         ["player.linkCard"] = true,
