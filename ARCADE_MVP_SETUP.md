@@ -20,6 +20,7 @@ This setup gives you a working minimum arcade system with:
 - `/frontdesk/main.lua`
 - `/kiosk/main.lua`
 - `/game/main.lua`
+- `/cabinet_test/main.lua`
 - `/install.lua`
 
 ## Quick Install (Recommended)
@@ -38,6 +39,7 @@ shell.run("/install.lua")
   - Front Desk Admin
   - Balance Checker Kiosk
   - Game Cabinet Client
+  - Cabinet Test Machine
 
 The installer will:
 - Copy only required files for that role
@@ -124,6 +126,10 @@ Kiosk machine:
 Game machine:
 - `/shared/*`
 - `/game/main.lua`
+
+Cabinet test machine:
+- `/shared/*`
+- `/cabinet_test/main.lua`
 
 ## 3) Shared Token
 

@@ -49,6 +49,15 @@ local roles = {
             "arcade_token.example.txt",
         },
     },
+    {
+        key = "5",
+        id = "cabinet_test",
+        name = "Cabinet Test Machine",
+        startupProgram = "/cabinet_test/main.lua",
+        roleFiles = {
+            "cabinet_test/main.lua",
+        },
+    },
 }
 
 local function clear()
@@ -232,6 +241,7 @@ local function writeStartup(programPath)
     file.writeLine("  frontdesk = { \"shared/protocol.lua\", \"shared/security.lua\", \"shared/net.lua\", \"shared/updater.lua\", \"frontdesk/main.lua\" },")
     file.writeLine("  kiosk = { \"shared/protocol.lua\", \"shared/security.lua\", \"shared/net.lua\", \"shared/updater.lua\", \"kiosk/main.lua\" },")
     file.writeLine("  game = { \"shared/protocol.lua\", \"shared/security.lua\", \"shared/net.lua\", \"shared/updater.lua\", \"game/main.lua\" },")
+    file.writeLine("  cabinet_test = { \"shared/protocol.lua\", \"shared/security.lua\", \"shared/net.lua\", \"shared/updater.lua\", \"cabinet_test/main.lua\" },")
     file.writeLine("}")
     file.writeLine("")
     file.writeLine("local function readRole()")

@@ -25,6 +25,9 @@ local roleFiles = {
         "game/main.lua",
         "arcade_token.example.txt",
     },
+    cabinet_test = {
+        "cabinet_test/main.lua",
+    },
 }
 
 local function trim(value)
