@@ -399,6 +399,44 @@ local function loadCreditsAction()
     refreshAll()
 end
 
+local function deleteCardAction()
+    local card = parseCardFile("/disk/arcade_card.txt")
+    if not card then
+        setMessage("No valid card file in /disk", true)
+        return
+    end
+
+    local values = ask("Delete Card", { "Type DELETE to confirm" })
+    if values[1] ~= "DELETE" then
+        setMessage("Delete card cancelled", false)
+        return
+    end
+
+    local ok, data, err = send("card.delete", {
+        cardId = card.cardId,
+        note = "frontdesk_delete_card",
+    })
+    if not ok then
+        setMessage("Delete card failed: " .. tostring(err), true)
+        return
+    end
+
+    if fs.exists("/disk/arcade_card.txt") then
+        fs.delete("/disk/arcade_card.txt")
+    end
+
+    local driveSide = findActiveDriveSide()
+    if driveSide then
+        pcall(disk.setLabel, driveSide, "Deleted Card")
+    end
+
+    setMessage(
+        "Deleted " .. card.cardId .. " (lost " .. tostring(data.lostCredits or 0) .. " credits)",
+        true
+    )
+    refreshAll()
+end
+
 local function searchAction()
     local values = ask("Search Players", { "Search text" })
     if refreshPlayers(values[1]) then
@@ -438,7 +476,7 @@ end
 
 local BUTTON_COLS = 4
 local BUTTON_ROWS_H = 2
-local BUTTON_AREA_H = BUTTON_ROWS_H * 2
+local buttonAreaH = BUTTON_ROWS_H * 2
 
 local function rebuildButtons()
     local width, height = term.getSize()
@@ -450,6 +488,7 @@ local function rebuildButtons()
         { key = "5", label = "UseCard",  action = linkCardAction,     bg = colors.lime      },
         { key = "6", label = "Refresh",  action = refreshAction,      bg = colors.gray,   fg = colors.white },
         { key = "7", label = "Load",     action = loadCreditsAction,  bg = colors.purple, fg = colors.white },
+        { key = "8", label = "Delete",   action = deleteCardAction,   bg = colors.brown,  fg = colors.white },
         { key = "0", label = "Exit",     action = nil,                bg = colors.red,    fg = colors.white },
     }
 
@@ -460,6 +499,7 @@ local function rebuildButtons()
     local usable = width - 2 - ((cols - 1) * gapX)
     local bw     = math.max(6, math.floor(usable / cols))
     local startY = height - rows * bh + 1
+    buttonAreaH = rows * bh
 
     buttons = {}
     for i, spec in ipairs(specs) do
@@ -583,7 +623,7 @@ local function drawDashboard()
     -- layout constants
     local HEADER_H  = 3
     local FOOTER_H  = 1   -- message bar
-    local BTN_H     = BUTTON_AREA_H
+    local BTN_H     = buttonAreaH
     local top       = HEADER_H + 1
     local contentH  = math.max(4, H - top - FOOTER_H - BTN_H - 1)
     local leftW     = math.max(16, math.floor(W * 0.28))
@@ -637,7 +677,7 @@ local function selectPlayerByClick(x, y)
     local W, H = term.getSize()
     local top    = 4   -- HEADER_H + 1
     local leftW  = math.max(16, math.floor(W * 0.28))
-    local BTN_H  = BUTTON_AREA_H
+    local BTN_H  = buttonAreaH
     local FOOT_H = 1
     local contentH = math.max(4, H - top - FOOT_H - BTN_H - 1)
 

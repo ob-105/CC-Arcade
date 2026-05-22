@@ -400,6 +400,43 @@ local function handleLinkCard(request)
     return true, { player = player }
 end
 
+local function handleCardDelete(request)
+    local payload = request.payload or {}
+    local cardId = payload.cardId
+    if type(cardId) ~= "string" or cardId == "" then
+        return false, nil, "INVALID_CARD"
+    end
+
+    local playerId = state.cardIndex[cardId]
+    if not playerId then
+        return false, nil, "CARD_NOT_FOUND"
+    end
+
+    local player = state.playersById[playerId]
+    if not player then
+        state.cardIndex[cardId] = nil
+        persistPlayers()
+        return false, nil, "PLAYER_NOT_FOUND"
+    end
+
+    local lostCredits = tonumber(player.credits) or 0
+    local lostTickets = tonumber(player.tickets) or 0
+
+    state.cardIndex[cardId] = nil
+    state.playersById[playerId] = nil
+    persistPlayers()
+
+    addTransaction(playerId, "card_delete", -lostCredits, 0, request.machineId, request.role, cardId)
+    pushLog("Deleted card " .. cardId .. " account " .. playerId .. " (lost credits " .. tostring(lostCredits) .. ")")
+
+    return true, {
+        cardId = cardId,
+        playerId = playerId,
+        lostCredits = lostCredits,
+        lostTickets = lostTickets,
+    }
+end
+
 local function applyCreditsChange(request, txType, signedAmount)
     local payload = request.payload or {}
     local player = getPlayer(payload)
@@ -526,6 +563,10 @@ local function handleMessage(request)
 
     if request.type == "player.linkCard" then
         return handleLinkCard(request)
+    end
+
+    if request.type == "card.delete" then
+        return handleCardDelete(request)
     end
 
     if request.type == "balance.get" then

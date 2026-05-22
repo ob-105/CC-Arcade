@@ -10,6 +10,7 @@ local rolePermissions = {
         ["player.create"] = true,
         ["player.rename"] = true,
         ["player.linkCard"] = true,
+        ["card.delete"] = true,
         ["balance.get"] = true,
         ["credits.add"] = true,
         ["tickets.add"] = true,

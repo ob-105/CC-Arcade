@@ -192,6 +192,7 @@ At the front desk terminal:
 3. Issue new card on disk
 4. Press Card to register/use that card account
 5. Load credits to selected player or directly from inserted card
+6. Delete card with Delete button (type DELETE to confirm); this removes that card account and its balances
 
 The card file is written to:
 - `/disk/arcade_card.txt`
