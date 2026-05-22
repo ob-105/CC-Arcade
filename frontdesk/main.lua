@@ -408,8 +408,17 @@ end
 
 local function deleteCardAction()
     local card = parseCardFile("/disk/arcade_card.txt")
-    if not card then
-        setMessage("No valid card file in /disk", true)
+    local selected = currentPlayer()
+
+    local cardId = nil
+    local fromDisk = false
+    if card then
+        cardId = card.cardId
+        fromDisk = true
+    elseif selected and selected.cardId and selected.cardId ~= "" then
+        cardId = selected.cardId
+    else
+        setMessage("Insert card or select a card account", true)
         return
     end
 
@@ -423,7 +432,7 @@ local function deleteCardAction()
     end
 
     local ok, data, err = send("card.delete", {
-        cardId = card.cardId,
+        cardId = cardId,
         note = "frontdesk_delete_card",
     })
     if not ok then
@@ -431,17 +440,17 @@ local function deleteCardAction()
         return
     end
 
-    if fs.exists("/disk/arcade_card.txt") then
+    if fromDisk and fs.exists("/disk/arcade_card.txt") then
         fs.delete("/disk/arcade_card.txt")
     end
 
     local driveSide = findActiveDriveSide()
-    if driveSide then
+    if fromDisk and driveSide then
         pcall(disk.setLabel, driveSide, "Deleted Card")
     end
 
     setMessage(
-        "Deleted " .. card.cardId .. " (lost " .. tostring(data.lostCredits or 0) .. " credits)",
+        "Deleted " .. cardId .. " (lost " .. tostring(data.lostCredits or 0) .. " credits)",
         true
     )
     refreshAll()
