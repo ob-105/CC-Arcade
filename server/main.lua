@@ -18,6 +18,7 @@ local state = {
 }
 
 local persistPlayers
+local addTransaction
 
 local function ensureDir(path)
     if not fs.exists(path) then
@@ -190,7 +191,7 @@ local function createCardAccount(cardId, machineId, role)
     return player
 end
 
-local function addTransaction(playerId, txType, amount, balanceAfter, sourceMachineId, sourceRole, note)
+function addTransaction(playerId, txType, amount, balanceAfter, sourceMachineId, sourceRole, note)
     local tx = {
         txId = txId(),
         playerId = playerId,
