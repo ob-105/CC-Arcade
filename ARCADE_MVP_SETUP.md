@@ -192,11 +192,19 @@ At kiosk terminal:
 At game terminal:
 
 - Insert linked player card disk
-- Start round (costs credits)
+- Start round using cabinet start signal (redstone input), not keyboard
 - Game spends tickets for start and optional upgrades
 - Game awards tickets by score tier
 - Save data is kept on card at:
   - `/disk/saves/demo_racer.txt`
+
+No operator interaction is required during normal play. This allows the arcade client computer to stay underground/inaccessible during operation.
+
+Default start signal config in game client:
+- `startSignalSide = "back"`
+- `startSignalActive = true`
+
+If your cabinet uses a different side, update those values in `/game/main.lua`.
 
 ## 8) Server Data Files
 

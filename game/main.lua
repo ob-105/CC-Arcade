@@ -13,6 +13,10 @@ local config = {
     requestTimeout = 5,
     serverId = nil,
     creditCostStart = 1,
+    startSignalSide = "back",
+    startSignalActive = true,
+    autoStartDelaySeconds = 0.25,
+    autoBuyEngineUpgrade = false,
     awardByScoreTier = {
         { minScore = 0, tickets = 0 },
         { minScore = 100, tickets = 5 },
@@ -29,9 +33,20 @@ local function clear()
     term.setCursorPos(1, 1)
 end
 
-local function ask(prompt)
-    write(prompt)
-    return read()
+local lastStatus = ""
+
+local function status(message)
+    if message == lastStatus then
+        return
+    end
+
+    lastStatus = message
+    clear()
+    print("Demo Racer Cabinet Client")
+    print("Machine: " .. MACHINE_ID)
+    print("Server: " .. tostring(config.serverId))
+    print(string.rep("-", 38))
+    print(message)
 end
 
 local function parseKeyValueFile(path)
@@ -80,23 +95,39 @@ local function writeKeyValueFile(path, data)
     return true
 end
 
+local discoverServer
+
 local function send(messageType, payload)
     local token = security.loadToken(TOKEN_FILE)
-    local request = protocol.makeRequest(MACHINE_ID, ROLE, token, messageType, payload)
-    local ok, response, err = net.sendRequest(config.serverId, request, config.requestTimeout)
+    local function sendOnce()
+        local request = protocol.makeRequest(MACHINE_ID, ROLE, token, messageType, payload)
+        local ok, response, err = net.sendRequest(config.serverId, request, config.requestTimeout)
 
-    if not ok then
-        return false, nil, err
+        if not ok then
+            return false, nil, err
+        end
+
+        if not response.ok then
+            return false, nil, response.error
+        end
+
+        return true, response.data, nil
     end
 
-    if not response.ok then
-        return false, nil, response.error
+    local ok, data, err = sendOnce()
+    if ok then
+        return true, data, nil
     end
 
-    return true, response.data, nil
+    local discovered, discoverErr = discoverServer()
+    if not discovered then
+        return false, nil, discoverErr or err
+    end
+
+    return sendOnce()
 end
 
-local function discoverServer()
+discoverServer = function()
     local token = security.loadToken(TOKEN_FILE)
     local serverId, err = net.discoverServer(MACHINE_ID, ROLE, token, 3)
     if not serverId then
@@ -178,13 +209,7 @@ local function playRound(save)
     local bonus = (save.engineLevel + save.tireLevel + save.armorLevel) * math.random(5, 25)
     local score = base + bonus
 
-    local upgradeBought = false
-    if score > 450 and save.engineLevel < 5 then
-        local ok = ask("Buy engine upgrade for 1 credit? [y/N] ")
-        if string.lower(ok) == "y" then
-            upgradeBought = true
-        end
-    end
+    local upgradeBought = config.autoBuyEngineUpgrade and score > 450 and save.engineLevel < 5
 
     return {
         score = score,
@@ -193,36 +218,64 @@ local function playRound(save)
     }
 end
 
+local function hasCard()
+    return readCard() ~= nil
+end
+
+local function waitForCard()
+    status("Idle: waiting for player card disk")
+    while true do
+        local card = readCard()
+        if card then
+            return card
+        end
+        sleep(0.2)
+    end
+end
+
+local function waitForStartSignal()
+    if not config.startSignalSide or config.startSignalSide == "" then
+        sleep(config.autoStartDelaySeconds)
+        return true, nil
+    end
+
+    status("Card detected. Waiting start signal on " .. config.startSignalSide)
+
+    while true do
+        if not hasCard() then
+            return false, "CARD_REMOVED"
+        end
+
+        local active = redstone.getInput(config.startSignalSide) == config.startSignalActive
+        if active then
+            while redstone.getInput(config.startSignalSide) == config.startSignalActive do
+                sleep(0.05)
+            end
+            return true, nil
+        end
+
+        sleep(0.05)
+    end
+end
+
 local function runGameLoop()
     while true do
-        clear()
-        print("Demo Racer Cabinet")
-        print("Machine: " .. MACHINE_ID)
-        print("Insert card disk and press Enter.")
-        read()
+        local card = waitForCard()
 
-        local card = readCard()
-        if not card then
-            print("No valid card found at /disk/arcade_card.txt")
-            print("Press Enter to try again")
-            read()
+        local lookupOk, playerData, lookupErr = send("player.lookup", { cardId = card.cardId })
+        if not lookupOk then
+            status("Card read but player lookup failed: " .. tostring(lookupErr))
+            sleep(1)
         else
-            local ok, playerData, err = send("player.lookup", { cardId = card.cardId })
-            if not ok then
-                print("Player lookup failed: " .. tostring(err))
-                print("Press Enter to try again")
-                read()
+            local player = playerData.player
+            local save = loadSave()
+
+            status("Player " .. player.displayName .. " ready. Awaiting start signal.")
+            local startOk, startErr = waitForStartSignal()
+            if not startOk then
+                status("Round cancelled: " .. tostring(startErr))
+                sleep(0.5)
             else
-                local player = playerData.player
-                local save = loadSave()
-
-                clear()
-                print("Welcome " .. player.displayName)
-                print("Tickets: " .. tostring(player.tickets))
-                print("Engine level: " .. tostring(save.engineLevel))
-                print("Press Enter to start round (cost " .. tostring(config.creditCostStart) .. " credit)")
-                read()
-
                 local spendOk, spendData, spendErr = send("game.credit.take", {
                     playerId = player.playerId,
                     amount = config.creditCostStart,
@@ -231,13 +284,10 @@ local function runGameLoop()
                 })
 
                 if not spendOk then
-                    print("Credit denied: " .. tostring(spendErr))
-                    print("Press Enter")
-                    read()
+                    status("Credit denied: " .. tostring(spendErr))
+                    sleep(1)
                 else
                     local result = playRound(save)
-                    print("Round score: " .. tostring(result.score))
-                    print("Tickets earned: " .. tostring(result.tickets))
 
                     if result.engineUpgradeBought then
                         local upgradeOk = send("game.credit.take", {
@@ -248,34 +298,24 @@ local function runGameLoop()
                         })
                         if upgradeOk then
                             save.engineLevel = math.min(save.engineLevel + 1, 5)
-                            print("Engine upgraded to level " .. tostring(save.engineLevel))
-                        else
-                            print("Upgrade skipped due to credits")
                         end
                     end
 
                     if result.tickets > 0 then
-                        local awardOk, awardData, awardErr = send("game.ticket.award", {
+                        send("game.ticket.award", {
                             playerId = player.playerId,
                             amount = result.tickets,
                             note = "round_complete",
                             score = result.score,
                             gameId = GAME_ID,
                         })
-
-                        if awardOk then
-                            print("Awarded. New balance: " .. tostring(awardData.balanceAfter))
-                        else
-                            print("Award failed: " .. tostring(awardErr))
-                        end
                     end
 
                     save.lastPlayedAt = os.epoch("utc")
                     savePlayerData(save)
 
-                    print("Spent start credit. Balance after spend: " .. tostring(spendData.balanceAfter))
-                    print("Press Enter for next player")
-                    read()
+                    status("Round done for " .. player.displayName .. " | score " .. tostring(result.score) .. " | spend bal " .. tostring(spendData.balanceAfter))
+                    sleep(1)
                 end
             end
         end
@@ -292,7 +332,7 @@ local function boot()
 
     local ok, err = discoverServer()
     if not ok then
-        error("Server discovery failed: " .. tostring(err))
+        status("Initial server discovery failed: " .. tostring(err))
     end
 
     runGameLoop()
