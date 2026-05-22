@@ -7,15 +7,16 @@ local ROLE = "game"
 local TOKEN_FILE = "/arcade_token.txt"
 
 local GAME_ID = "demo_racer"
-local SAVE_FILE = "/disk/saves/demo_racer.txt"
 
 local config = {
     requestTimeout = 5,
     serverId = nil,
+    backboneModemSide = "bottom",
+    cabinetModemSide = "back",
+    cardDriveSide = "top",
+    cabinetChannel = 34001,
+    cabinetReplyChannel = 34002,
     creditCostStart = 1,
-    startSignalSide = "back",
-    startSignalActive = true,
-    autoStartDelaySeconds = 0.25,
     autoBuyEngineUpgrade = false,
     awardByScoreTier = {
         { minScore = 0, tickets = 0 },
@@ -47,6 +48,55 @@ local function status(message)
     print("Server: " .. tostring(config.serverId))
     print(string.rep("-", 38))
     print(message)
+end
+
+local function isWiredModemSide(side)
+    if peripheral.getType(side) ~= "modem" then
+        return false
+    end
+
+    local ok, wireless = pcall(peripheral.call, side, "isWireless")
+    return ok and wireless == false
+end
+
+local function openBackboneRednet()
+    local side = config.backboneModemSide
+    if not isWiredModemSide(side) then
+        error("Backbone modem side is not a wired modem: " .. tostring(side))
+    end
+
+    if not rednet.isOpen(side) then
+        rednet.open(side)
+    end
+end
+
+local function openCabinetModemChannels()
+    local side = config.cabinetModemSide
+    if not isWiredModemSide(side) then
+        error("Cabinet modem side is not a wired modem: " .. tostring(side))
+    end
+
+    peripheral.call(side, "open", config.cabinetChannel)
+    peripheral.call(side, "open", config.cabinetReplyChannel)
+end
+
+local function cabinetSend(message)
+    local side = config.cabinetModemSide
+    if not isWiredModemSide(side) then
+        return false
+    end
+
+    peripheral.call(side, "transmit", config.cabinetChannel, config.cabinetReplyChannel, message)
+    return true
+end
+
+local function getCardMountPath()
+    local side = config.cardDriveSide
+    if not disk.isPresent(side) or not disk.hasData(side) then
+        return nil
+    end
+
+    return disk.getMountPath(side)
 end
 
 local function parseKeyValueFile(path)
@@ -139,16 +189,24 @@ discoverServer = function()
 end
 
 local function readCard()
-    local card = parseKeyValueFile("/disk/arcade_card.txt")
+    local mountPath = getCardMountPath()
+    if not mountPath then
+        return nil
+    end
+
+    local card = parseKeyValueFile(fs.combine(mountPath, "arcade_card.txt"))
     if not card or not card.cardId then
         return nil
     end
 
+    card._mountPath = mountPath
+
     return card
 end
 
-local function loadSave()
-    local save = parseKeyValueFile(SAVE_FILE)
+local function loadSave(cardMountPath)
+    local savePath = fs.combine(cardMountPath, "saves/" .. GAME_ID .. ".txt")
+    local save = parseKeyValueFile(savePath)
     if not save then
         return {
             profileVersion = 1,
@@ -185,8 +243,9 @@ local function loadSave()
     }
 end
 
-local function savePlayerData(save)
-    return writeKeyValueFile(SAVE_FILE, save)
+local function savePlayerData(cardMountPath, save)
+    local savePath = fs.combine(cardMountPath, "saves/" .. GAME_ID .. ".txt")
+    return writeKeyValueFile(savePath, save)
 end
 
 local function computeAward(score)
@@ -223,7 +282,8 @@ local function hasCard()
 end
 
 local function waitForCard()
-    status("Idle: waiting for player card disk")
+    status("Idle: waiting for card in top drive")
+    cabinetSend({ type = "client.idle_waiting_card", machineId = MACHINE_ID, gameId = GAME_ID })
     while true do
         local card = readCard()
         if card then
@@ -233,28 +293,38 @@ local function waitForCard()
     end
 end
 
-local function waitForStartSignal()
-    if not config.startSignalSide or config.startSignalSide == "" then
-        sleep(config.autoStartDelaySeconds)
-        return true, nil
-    end
-
-    status("Card detected. Waiting start signal on " .. config.startSignalSide)
+local function waitForCabinetStart(cardId)
+    status("Card detected. Waiting cabinet start event on back modem")
+    cabinetSend({
+        type = "client.player_ready",
+        machineId = MACHINE_ID,
+        gameId = GAME_ID,
+        cardId = cardId,
+    })
 
     while true do
         if not hasCard() then
             return false, "CARD_REMOVED"
         end
 
-        local active = redstone.getInput(config.startSignalSide) == config.startSignalActive
-        if active then
-            while redstone.getInput(config.startSignalSide) == config.startSignalActive do
-                sleep(0.05)
-            end
-            return true, nil
-        end
+        local event, side, channel, replyChannel, payload = os.pullEvent()
+        if event == "modem_message" and side == config.cabinetModemSide then
+            if channel == config.cabinetChannel or channel == config.cabinetReplyChannel then
+                if type(payload) == "table" then
+                    if payload.type == "cabinet.start_pressed" or payload.type == "start_pressed" then
+                        return true, nil
+                    end
 
-        sleep(0.05)
+                    if payload.type == "cabinet.ping" then
+                        cabinetSend({
+                            type = "client.pong",
+                            machineId = MACHINE_ID,
+                            gameId = GAME_ID,
+                        })
+                    end
+                end
+            end
+        end
     end
 end
 
@@ -268,14 +338,22 @@ local function runGameLoop()
             sleep(1)
         else
             local player = playerData.player
-            local save = loadSave()
+            local save = loadSave(card._mountPath)
 
-            status("Player " .. player.displayName .. " ready. Awaiting start signal.")
-            local startOk, startErr = waitForStartSignal()
+            status("Player " .. player.displayName .. " ready. Awaiting cabinet start.")
+            local startOk, startErr = waitForCabinetStart(card.cardId)
             if not startOk then
                 status("Round cancelled: " .. tostring(startErr))
                 sleep(0.5)
             else
+                cabinetSend({
+                    type = "client.round_starting",
+                    machineId = MACHINE_ID,
+                    gameId = GAME_ID,
+                    playerId = player.playerId,
+                    cardId = card.cardId,
+                })
+
                 local spendOk, spendData, spendErr = send("game.credit.take", {
                     playerId = player.playerId,
                     amount = config.creditCostStart,
@@ -285,6 +363,12 @@ local function runGameLoop()
 
                 if not spendOk then
                     status("Credit denied: " .. tostring(spendErr))
+                    cabinetSend({
+                        type = "client.round_denied",
+                        machineId = MACHINE_ID,
+                        gameId = GAME_ID,
+                        reason = spendErr,
+                    })
                     sleep(1)
                 else
                     local result = playRound(save)
@@ -312,7 +396,16 @@ local function runGameLoop()
                     end
 
                     save.lastPlayedAt = os.epoch("utc")
-                    savePlayerData(save)
+                    savePlayerData(card._mountPath, save)
+
+                    cabinetSend({
+                        type = "client.round_complete",
+                        machineId = MACHINE_ID,
+                        gameId = GAME_ID,
+                        playerId = player.playerId,
+                        score = result.score,
+                        tickets = result.tickets,
+                    })
 
                     status("Round done for " .. player.displayName .. " | score " .. tostring(result.score) .. " | spend bal " .. tostring(spendData.balanceAfter))
                     sleep(1)
@@ -325,9 +418,11 @@ end
 local function boot()
     math.randomseed(os.epoch("utc"))
 
-    local opened = net.openWiredModems()
-    if opened == 0 then
-        error("No wired modem found. Attach at least one wired modem.")
+    openBackboneRednet()
+    openCabinetModemChannels()
+
+    if peripheral.getType(config.cardDriveSide) ~= "drive" then
+        error("Expected disk drive on side: " .. tostring(config.cardDriveSide))
     end
 
     local ok, err = discoverServer()
