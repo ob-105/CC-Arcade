@@ -175,7 +175,14 @@ local function renamePlayer()
 end
 
 local function linkCard()
-    local playerId = ask("playerId: ")
+    local mode = ask("Link by [1] playerId [2] display name: ")
+    local payload = {}
+
+    if mode == "1" then
+        payload.playerId = ask("playerId: ")
+    else
+        payload.displayName = ask("displayName: ")
+    end
 
     local card = parseCardFile("/disk/arcade_card.txt")
     if not card then
@@ -183,10 +190,9 @@ local function linkCard()
         return
     end
 
-    local ok, data, err = send("player.linkCard", {
-        playerId = playerId,
-        cardId = card.cardId,
-    })
+    payload.cardId = card.cardId
+
+    local ok, data, err = send("player.linkCard", payload)
 
     if not ok then
         print("Link failed: " .. tostring(err))
@@ -261,7 +267,7 @@ local function showMenu()
     print("2) Lookup player")
     print("3) Rename player")
     print("4) Issue new card on disk")
-    print("5) Link inserted card to player")
+    print("5) Link inserted card to player (name or id)")
     print("6) Add tickets")
     print("7) Remove tickets")
     print("8) View recent transactions")
