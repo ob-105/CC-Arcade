@@ -7,6 +7,7 @@ This setup gives you a working minimum arcade system with:
 - Front desk admin terminal
 - Player balance checker kiosk
 - One demo game cabinet client
+- One-click role installer that writes startup
 
 ## Project Files
 
@@ -17,6 +18,32 @@ This setup gives you a working minimum arcade system with:
 - `/frontdesk/main.lua`
 - `/kiosk/main.lua`
 - `/game/main.lua`
+- `/install.lua`
+
+## Quick Install (Recommended)
+
+On each ComputerCraft computer:
+
+1. Place this project folder on the computer (or disk mount).
+2. Run installer:
+
+```lua
+shell.run("/install.lua")
+```
+
+3. Pick machine role:
+  - Central Server
+  - Front Desk Admin
+  - Balance Checker Kiosk
+  - Game Cabinet Client
+
+The installer will:
+- Copy only required files for that role
+- Preserve or create `/arcade_token.txt`
+- Write `/startup` to auto-run that machine's main program
+- Offer reboot so startup immediately applies
+
+This startup behavior keeps machines persistent across chunk unload/reload, because ComputerCraft reruns startup on boot.
 
 ## 1) Wire the Network
 
