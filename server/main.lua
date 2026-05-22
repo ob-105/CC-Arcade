@@ -237,6 +237,38 @@ local function handlePlayerLookup(request)
     return true, { player = player }
 end
 
+local function handlePlayerList(request)
+    local payload = request.payload or {}
+    local search = payload.search and string.lower(payload.search) or nil
+    local items = {}
+
+    for _, player in pairs(state.playersById) do
+        local include = true
+        if search and search ~= "" then
+            local nameMatch = string.find(string.lower(player.displayName), search, 1, true) ~= nil
+            local idMatch = string.find(string.lower(player.playerId), search, 1, true) ~= nil
+            local cardMatch = player.cardId and string.find(string.lower(player.cardId), search, 1, true) ~= nil or false
+            include = nameMatch or idMatch or cardMatch
+        end
+
+        if include then
+            table.insert(items, {
+                playerId = player.playerId,
+                displayName = player.displayName,
+                tickets = TICKET_MODE_ENABLED and player.tickets or 0,
+                cardId = player.cardId,
+                updatedAt = player.updatedAt,
+            })
+        end
+    end
+
+    table.sort(items, function(a, b)
+        return string.lower(a.displayName) < string.lower(b.displayName)
+    end)
+
+    return true, { items = items }
+end
+
 local function handlePlayerRename(request)
     local payload = request.payload or {}
     local player = getPlayer(payload)
@@ -364,6 +396,10 @@ local function handleMessage(request)
 
     if request.type == "player.lookup" then
         return handlePlayerLookup(request)
+    end
+
+    if request.type == "player.list" then
+        return handlePlayerList(request)
     end
 
     if request.type == "player.rename" then
