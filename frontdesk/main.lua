@@ -264,7 +264,7 @@ local function currentPlayer()
 end
 
 local function createPlayerAction()
-    local values = ask("Create Player", { "Display name" })
+    local values = ask("Create Manual Account", { "Account name" })
     if values[1] == "" then
         setMessage("Create cancelled", false)
         return
@@ -276,18 +276,18 @@ local function createPlayerAction()
         return
     end
 
-    setMessage("Created " .. data.player.displayName, false)
+    setMessage("Created account " .. data.player.displayName, false)
     refreshAll()
 end
 
 local function renamePlayerAction()
     local player = currentPlayer()
     if not player then
-        setMessage("No player selected", true)
+        setMessage("No account selected", true)
         return
     end
 
-    local values = ask("Rename Player", { "New display name" })
+    local values = ask("Rename Account", { "New account name" })
     if values[1] == "" then
         setMessage("Rename cancelled", false)
         return
@@ -302,7 +302,7 @@ local function renamePlayerAction()
         return
     end
 
-    setMessage("Renamed to " .. data.player.displayName, false)
+    setMessage("Renamed account to " .. data.player.displayName, false)
     refreshAll()
 end
 
@@ -351,7 +351,7 @@ local function linkCardAction()
         return
     end
 
-    setMessage("Card account ready: " .. data.player.displayName, false)
+    setMessage("Using card account: " .. data.player.displayName, false)
     refreshAll()
 end
 
@@ -444,10 +444,10 @@ local function rebuildButtons()
     local width, height = term.getSize()
     local specs = {
         { key = "1", label = "Search",   action = searchAction,       bg = colors.cyan      },
-        { key = "2", label = "Create",   action = createPlayerAction, bg = colors.lightBlue },
-        { key = "3", label = "Rename",   action = renamePlayerAction, bg = colors.orange    },
+        { key = "2", label = "Manual",   action = createPlayerAction, bg = colors.lightBlue },
+        { key = "3", label = "Name",     action = renamePlayerAction, bg = colors.orange    },
         { key = "4", label = "Issue",    action = issueCardAction,    bg = colors.yellow    },
-        { key = "5", label = "Card",     action = linkCardAction,     bg = colors.lime      },
+        { key = "5", label = "UseCard",  action = linkCardAction,     bg = colors.lime      },
         { key = "6", label = "Refresh",  action = refreshAction,      bg = colors.gray,   fg = colors.white },
         { key = "7", label = "Load",     action = loadCreditsAction,  bg = colors.purple, fg = colors.white },
         { key = "0", label = "Exit",     action = nil,                bg = colors.red,    fg = colors.white },
