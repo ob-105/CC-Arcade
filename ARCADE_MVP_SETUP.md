@@ -8,12 +8,14 @@ This setup gives you a working minimum arcade system with:
 - Player balance checker kiosk
 - One demo game cabinet client
 - One-click role installer that writes startup
+- Boot-time auto-updating from GitHub
 
 ## Project Files
 
 - `/shared/protocol.lua`
 - `/shared/security.lua`
 - `/shared/net.lua`
+- `/shared/updater.lua`
 - `/server/main.lua`
 - `/frontdesk/main.lua`
 - `/kiosk/main.lua`
@@ -40,10 +42,25 @@ shell.run("/install.lua")
 The installer will:
 - Copy only required files for that role
 - Preserve or create `/arcade_token.txt`
-- Write `/startup` to auto-run that machine's main program
+- Write `/arcade_role.txt` for role metadata
+- Write `/startup` to auto-update from GitHub, then run that machine's main program
 - Offer reboot so startup immediately applies
 
 This startup behavior keeps machines persistent across chunk unload/reload, because ComputerCraft reruns startup on boot.
+
+## Auto Update Behavior
+
+On every boot, startup calls `/shared/updater.lua` first.
+
+Updater behavior:
+- Reads `/arcade_role.txt`
+- Downloads latest shared + role files from GitHub `main`
+- Replaces local installed code
+- Continues to machine program even if update fails
+
+Important:
+- ComputerCraft HTTP API must be enabled in server config for updates to work.
+- Token file `/arcade_token.txt` is not overwritten by updater.
 
 ## 1) Wire the Network
 

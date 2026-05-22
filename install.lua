@@ -3,6 +3,7 @@ local INSTALLER_TITLE = "CC Arcade Installer"
 local roles = {
     {
         key = "1",
+        id = "server",
         name = "Central Server",
         startupProgram = "/server/main.lua",
         paths = {
@@ -13,6 +14,7 @@ local roles = {
     },
     {
         key = "2",
+        id = "frontdesk",
         name = "Front Desk Admin",
         startupProgram = "/frontdesk/main.lua",
         paths = {
@@ -23,6 +25,7 @@ local roles = {
     },
     {
         key = "3",
+        id = "kiosk",
         name = "Balance Checker Kiosk",
         startupProgram = "/kiosk/main.lua",
         paths = {
@@ -33,6 +36,7 @@ local roles = {
     },
     {
         key = "4",
+        id = "game",
         name = "Game Cabinet Client",
         startupProgram = "/game/main.lua",
         paths = {
@@ -139,6 +143,17 @@ local function writeTokenIfMissing()
     return true
 end
 
+local function writeRoleFile(roleId)
+    local file = fs.open("/arcade_role.txt", "w")
+    if not file then
+        return false
+    end
+
+    file.writeLine(roleId)
+    file.close()
+    return true
+end
+
 local function writeStartup(programPath)
     local startupPath = "/startup"
 
@@ -153,6 +168,17 @@ local function writeStartup(programPath)
         return false, "Could not write /startup"
     end
 
+    file.writeLine("local ok, updater = pcall(dofile, \"/shared/updater.lua\")")
+    file.writeLine("if ok and updater and updater.runUpdate then")
+    file.writeLine("  local updateOk = pcall(updater.runUpdate)")
+    file.writeLine("  if not updateOk then")
+    file.writeLine("    print(\"[startup] updater runtime error\")")
+    file.writeLine("    sleep(1)")
+    file.writeLine("  end")
+    file.writeLine("else")
+    file.writeLine("  print(\"[startup] updater not available\")")
+    file.writeLine("  sleep(1)")
+    file.writeLine("end")
     file.writeLine("shell.run(\"" .. programPath .. "\")")
     file.close()
 
@@ -235,6 +261,7 @@ local function runInstall()
     end
 
     local tokenCreated = writeTokenIfMissing()
+    local roleFileOk = writeRoleFile(role.id)
 
     print("")
     print("Writing startup...")
@@ -251,8 +278,14 @@ local function runInstall()
         print("Existing /arcade_token.txt preserved")
     end
 
+    if roleFileOk then
+        print("Wrote /arcade_role.txt as " .. role.id)
+    else
+        print("Failed to write /arcade_role.txt")
+    end
+
     if startupOk then
-        print("Startup now runs: " .. role.startupProgram)
+        print("Startup now runs updater then: " .. role.startupProgram)
     else
         print("Startup write failed: " .. tostring(startupErr))
     end
