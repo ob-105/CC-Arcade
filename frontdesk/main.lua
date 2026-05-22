@@ -436,37 +436,46 @@ local function drawButton(btn)
     end
 end
 
+local BUTTON_COLS = 4
+local BUTTON_ROWS_H = 2
+local BUTTON_AREA_H = BUTTON_ROWS_H * 2
+
 local function rebuildButtons()
     local width, height = term.getSize()
     local specs = {
-        { key = "1", label = "Search",    action = searchAction,       bg = colors.cyan      },
-        { key = "2", label = "Create",    action = createPlayerAction, bg = colors.lightBlue },
-        { key = "3", label = "Rename",    action = renamePlayerAction, bg = colors.orange    },
-        { key = "4", label = "IssueCard", action = issueCardAction,    bg = colors.yellow    },
-        { key = "5", label = "LinkCard",  action = linkCardAction,     bg = colors.lime      },
-        { key = "6", label = "Refresh",   action = refreshAction,      bg = colors.gray,  fg = colors.white },
-        { key = "7", label = "LoadCred",  action = loadCreditsAction,  bg = colors.purple, fg = colors.white },
-        { key = "0", label = "Exit",      action = nil,                bg = colors.red,   fg = colors.white },
+        { key = "1", label = "Search",   action = searchAction,       bg = colors.cyan      },
+        { key = "2", label = "Create",   action = createPlayerAction, bg = colors.lightBlue },
+        { key = "3", label = "Rename",   action = renamePlayerAction, bg = colors.orange    },
+        { key = "4", label = "Issue",    action = issueCardAction,    bg = colors.yellow    },
+        { key = "5", label = "Link",     action = linkCardAction,     bg = colors.lime      },
+        { key = "6", label = "Refresh",  action = refreshAction,      bg = colors.gray,   fg = colors.white },
+        { key = "7", label = "Load",     action = loadCreditsAction,  bg = colors.purple, fg = colors.white },
+        { key = "0", label = "Exit",     action = nil,                bg = colors.red,    fg = colors.white },
     }
 
-    local gap      = 1
-    local count    = #specs
-    local usable   = width - 2 - ((count - 1) * gap)
-    local bw       = math.max(8, math.floor(usable / count))
-    local bh       = 2
-    local by       = height - bh
+    local cols   = BUTTON_COLS
+    local rows   = math.ceil(#specs / cols)
+    local gapX   = 1
+    local bh     = BUTTON_ROWS_H
+    local usable = width - 2 - ((cols - 1) * gapX)
+    local bw     = math.max(6, math.floor(usable / cols))
+    local startY = height - rows * bh + 1
 
     buttons = {}
-    local x = 2
-    for _, spec in ipairs(specs) do
+    for i, spec in ipairs(specs) do
+        local row = math.floor((i - 1) / cols)
+        local col = (i - 1) % cols
         table.insert(buttons, {
             key    = spec.key,
             label  = spec.label,
             action = spec.action,
-            x = x, y = by, w = bw, h = bh,
-            bg = spec.bg, fg = spec.fg,
+            x = 2 + col * (bw + gapX),
+            y = startY + row * bh,
+            w = bw,
+            h = bh,
+            bg = spec.bg,
+            fg = spec.fg,
         })
-        x = x + bw + gap
     end
 end
 
@@ -573,9 +582,9 @@ local function drawDashboard()
     -- layout constants
     local HEADER_H  = 3
     local FOOTER_H  = 1   -- message bar
-    local BTN_H     = 2
+    local BTN_H     = BUTTON_AREA_H
     local top       = HEADER_H + 1
-    local contentH  = math.max(6, H - top - FOOTER_H - BTN_H - 1)
+    local contentH  = math.max(4, H - top - FOOTER_H - BTN_H - 1)
     local leftW     = math.max(16, math.floor(W * 0.28))
     local midW      = math.max(18, math.floor(W * 0.34))
     local rightW    = math.max(12, W - leftW - midW - 4)
@@ -627,9 +636,9 @@ local function selectPlayerByClick(x, y)
     local W, H = term.getSize()
     local top    = 4   -- HEADER_H + 1
     local leftW  = math.max(16, math.floor(W * 0.28))
-    local BTN_H  = 2
+    local BTN_H  = BUTTON_AREA_H
     local FOOT_H = 1
-    local contentH = math.max(6, H - top - FOOT_H - BTN_H - 1)
+    local contentH = math.max(4, H - top - FOOT_H - BTN_H - 1)
 
     if x < 2 or x > leftW + 1 then return false end
     if y <= top or y >= top + contentH then return false end
