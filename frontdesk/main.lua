@@ -14,9 +14,7 @@ local config = {
 local ui = {
     message = "",
     isError = false,
-    navWidth = 20,
-    headerHeight = 3,
-    statusHeight = 3,
+    menuTop = 6,
 }
 
 local function clear()
@@ -373,10 +371,10 @@ local function drawButton(button)
 end
 
 local function buildButtons()
-    local _, h = term.getSize()
-    local x = 2
-    local y = ui.headerHeight + 1
-    local w = ui.navWidth - 2
+    local width, h = term.getSize()
+    local w = math.min(28, math.max(18, width - 8))
+    local x = math.floor((width - w) / 2) + 1
+    local y = ui.menuTop
     local bh = 2
     local gap = 1
 
@@ -396,29 +394,17 @@ local function drawDashboard(buttons)
     clearAll(colors.black, colors.white)
     local width, height = term.getSize()
 
-    fillRect(1, 1, width, ui.headerHeight, colors.blue, colors.white)
-    writeAt(2, 2, "Arcade Front Desk", colors.blue, colors.white)
-    writeAt(22, 2, "Machine: " .. MACHINE_ID, colors.blue, colors.white)
-
-    local serverText = "Server: " .. tostring(config.serverId)
-    local serverX = math.max(2, width - #serverText - 1)
-    writeAt(serverX, 2, serverText, colors.blue, colors.white)
-
-    fillRect(1, ui.headerHeight + 1, ui.navWidth, height - ui.headerHeight - ui.statusHeight, colors.lightGray, colors.black)
-    fillRect(ui.navWidth + 1, ui.headerHeight + 1, width - ui.navWidth, height - ui.headerHeight - ui.statusHeight, colors.black, colors.white)
-
-    writeAt(ui.navWidth + 3, ui.headerHeight + 2, "Dashboard", colors.black, colors.white)
-    writeAt(ui.navWidth + 3, ui.headerHeight + 4, "Use left-side actions to manage players/cards.", colors.black, colors.lightGray)
-    writeAt(ui.navWidth + 3, ui.headerHeight + 5, "Ticket mode is disabled for current testing.", colors.black, colors.lightGray)
-    writeAt(ui.navWidth + 3, ui.headerHeight + 6, "Mouse clicks supported across all action buttons.", colors.black, colors.lightGray)
+    writeAt(math.max(1, math.floor((width - 17) / 2)), 2, "Arcade Front Desk", colors.black, colors.white)
+    writeAt(2, 3, clampText("Machine: " .. MACHINE_ID, width - 2), colors.black, colors.lightGray)
+    writeAt(2, 4, clampText("Server: " .. tostring(config.serverId), width - 2), colors.black, colors.lightGray)
+    writeAt(2, 5, "Ticket mode: disabled", colors.black, colors.lightGray)
 
     for _, button in ipairs(buttons) do
         drawButton(button)
     end
 
-    fillRect(1, height - ui.statusHeight + 1, width, ui.statusHeight, colors.gray, colors.white)
-    writeAt(2, height - 2, clampText(ui.message or "", width - 3), colors.gray, ui.isError and colors.red or colors.lime)
-    writeAt(2, height - 1, "Click action buttons. Keyboard shortcuts: 1-7, 0 exit", colors.gray, colors.white)
+    writeAt(2, height - 1, string.rep(" ", math.max(1, width - 2)), colors.black, colors.white)
+    writeAt(2, height - 1, clampText(ui.message or "", width - 3), colors.black, ui.isError and colors.red or colors.lime)
 end
 
 local function boot()
