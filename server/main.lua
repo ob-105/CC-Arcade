@@ -7,6 +7,7 @@ local TOKEN_FILE = "/arcade_token.txt"
 local PLAYERS_DB_PATH = "/server/db/players.db"
 local TX_DB_PATH = "/server/db/transactions.db"
 local ALLOWLIST_PATH = "/server/db/allowlist.db"
+local TICKET_MODE_ENABLED = false
 
 local state = {
     playersById = {},
@@ -295,6 +296,15 @@ local function applyTicketChange(request, txType, signedAmount)
         return false, nil, "PLAYER_NOT_FOUND"
     end
 
+    if not TICKET_MODE_ENABLED then
+        return true, {
+            playerId = player.playerId,
+            balanceAfter = player.tickets,
+            bypassed = true,
+            reason = "TICKET_MODE_DISABLED",
+        }
+    end
+
     if not security.isPositiveInt(payload.amount) then
         return false, nil, "INVALID_AMOUNT"
     end
@@ -372,7 +382,7 @@ local function handleMessage(request)
         return true, {
             playerId = data.player.playerId,
             displayName = data.player.displayName,
-            tickets = data.player.tickets,
+            tickets = TICKET_MODE_ENABLED and data.player.tickets or 0,
             cardId = data.player.cardId,
         }
     end
@@ -411,6 +421,7 @@ local function drawUi()
 
         print("Arcade Server | " .. SERVER_MACHINE_ID)
         print("Status: ONLINE  Players: " .. tostring(playerCount) .. "  Tx: " .. tostring(#state.transactions))
+        print("Ticket mode: " .. (TICKET_MODE_ENABLED and "ENABLED" or "DISABLED"))
         print("Token file: " .. TOKEN_FILE)
         print(string.rep("-", 50))
         print("Recent events:")

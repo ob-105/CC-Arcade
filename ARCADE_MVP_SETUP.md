@@ -10,6 +10,10 @@ This setup gives you a working minimum arcade system with:
 - One-click role installer that writes startup
 - Boot-time auto-updating from GitHub
 
+Current testing mode:
+- Ticket economy is temporarily disabled by default for easier bring-up.
+- Spend/award requests are accepted but bypassed while disabled.
+
 ## Project Files
 
 - `/shared/protocol.lua`
@@ -176,11 +180,13 @@ Clients auto-discover server using `ping`.
 
 At the front desk terminal:
 
+- Use mouse clicks on the dashboard UI buttons (keyboard shortcuts still work).
+
 1. Create player
 2. Insert blank floppy disk
 3. Issue new card on disk
 4. Link inserted card to player
-5. Add tickets to player
+5. Ticket actions are hidden while ticket mode is disabled
 
 The card file is written to:
 - `/disk/arcade_card.txt`
