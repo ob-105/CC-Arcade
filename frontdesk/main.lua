@@ -14,6 +14,9 @@ local config = {
 local ui = {
     message = "",
     isError = false,
+    navWidth = 20,
+    headerHeight = 3,
+    statusHeight = 3,
 }
 
 local function clear()
@@ -26,6 +29,44 @@ end
 local function ask(prompt)
     write(prompt)
     return read()
+end
+
+local function clearAll(bg, fg)
+    term.setBackgroundColor(bg or colors.black)
+    term.setTextColor(fg or colors.white)
+    term.clear()
+    term.setCursorPos(1, 1)
+end
+
+local function fillRect(x, y, w, h, bg, fg)
+    term.setBackgroundColor(bg)
+    term.setTextColor(fg)
+    for row = 0, h - 1 do
+        term.setCursorPos(x, y + row)
+        term.write(string.rep(" ", w))
+    end
+end
+
+local function writeAt(x, y, text, bg, fg)
+    if bg then
+        term.setBackgroundColor(bg)
+    end
+    if fg then
+        term.setTextColor(fg)
+    end
+    term.setCursorPos(x, y)
+    term.write(text)
+end
+
+local function clampText(text, width)
+    text = tostring(text or "")
+    if #text <= width then
+        return text
+    end
+    if width <= 3 then
+        return string.sub(text, 1, width)
+    end
+    return string.sub(text, 1, width - 3) .. "..."
 end
 
 local function setMessage(message, isError)
@@ -324,59 +365,60 @@ local function drawButton(button)
         term.write(string.rep(" ", button.w))
     end
 
-    local labelX = button.x + math.floor((button.w - #button.label) / 2)
+    local label = clampText(button.label, button.w - 2)
+    local labelX = button.x + math.floor((button.w - #label) / 2)
     local labelY = button.y + math.floor(button.h / 2)
     term.setCursorPos(labelX, labelY)
-    term.write(button.label)
+    term.write(label)
 end
 
 local function buildButtons()
+    local _, h = term.getSize()
+    local x = 2
+    local y = ui.headerHeight + 1
+    local w = ui.navWidth - 2
+    local bh = 2
+    local gap = 1
+
     return {
-        { key = "1", label = "Create Player", action = createPlayer, x = 2, y = 6, w = 24, h = 3, bg = colors.cyan },
-        { key = "2", label = "Lookup Player", action = lookupPlayer, x = 28, y = 6, w = 24, h = 3, bg = colors.cyan },
-        { key = "3", label = "Rename Player", action = renamePlayer, x = 2, y = 10, w = 24, h = 3, bg = colors.orange },
-        { key = "4", label = "Issue Card", action = issueCard, x = 28, y = 10, w = 24, h = 3, bg = colors.orange },
-        { key = "5", label = "Link Card", action = linkCard, x = 2, y = 14, w = 24, h = 3, bg = colors.lightBlue },
-        { key = "6", label = "Recent Logs", action = listRecent, x = 28, y = 14, w = 24, h = 3, bg = colors.lightBlue },
-        { key = "7", label = "Rediscover", action = rediscoverServerAction, x = 2, y = 18, w = 24, h = 3, bg = colors.lime },
-        { key = "0", label = "Exit", action = nil, x = 28, y = 18, w = 24, h = 3, bg = colors.red, fg = colors.white },
+        { key = "1", label = "Create Player", action = createPlayer, x = x, y = y + (bh + gap) * 0, w = w, h = bh, bg = colors.cyan },
+        { key = "2", label = "Lookup Player", action = lookupPlayer, x = x, y = y + (bh + gap) * 1, w = w, h = bh, bg = colors.lightBlue },
+        { key = "3", label = "Rename Player", action = renamePlayer, x = x, y = y + (bh + gap) * 2, w = w, h = bh, bg = colors.orange },
+        { key = "4", label = "Issue Card", action = issueCard, x = x, y = y + (bh + gap) * 3, w = w, h = bh, bg = colors.yellow },
+        { key = "5", label = "Link Card", action = linkCard, x = x, y = y + (bh + gap) * 4, w = w, h = bh, bg = colors.lime },
+        { key = "6", label = "Recent Logs", action = listRecent, x = x, y = y + (bh + gap) * 5, w = w, h = bh, bg = colors.pink },
+        { key = "7", label = "Rediscover", action = rediscoverServerAction, x = x, y = y + (bh + gap) * 6, w = w, h = bh, bg = colors.gray, fg = colors.white },
+        { key = "0", label = "Exit", action = nil, x = x, y = h - 2, w = w, h = bh, bg = colors.red, fg = colors.white },
     }
 end
 
 local function drawDashboard(buttons)
-    clear()
+    clearAll(colors.black, colors.white)
     local width, height = term.getSize()
 
-    term.setBackgroundColor(colors.gray)
-    term.setTextColor(colors.white)
-    term.setCursorPos(1, 1)
-    term.write(string.rep(" ", width))
-    term.setCursorPos(2, 1)
-    term.write("Arcade Front Desk")
+    fillRect(1, 1, width, ui.headerHeight, colors.blue, colors.white)
+    writeAt(2, 2, "Arcade Front Desk", colors.blue, colors.white)
+    writeAt(22, 2, "Machine: " .. MACHINE_ID, colors.blue, colors.white)
 
-    term.setBackgroundColor(colors.black)
-    term.setTextColor(colors.lightGray)
-    term.setCursorPos(2, 2)
-    term.write("Machine: " .. MACHINE_ID)
-    term.setCursorPos(2, 3)
-    term.write("Server: " .. tostring(config.serverId))
-    term.setCursorPos(2, 4)
-    term.write("Ticket mode: disabled")
+    local serverText = "Server: " .. tostring(config.serverId)
+    local serverX = math.max(2, width - #serverText - 1)
+    writeAt(serverX, 2, serverText, colors.blue, colors.white)
+
+    fillRect(1, ui.headerHeight + 1, ui.navWidth, height - ui.headerHeight - ui.statusHeight, colors.lightGray, colors.black)
+    fillRect(ui.navWidth + 1, ui.headerHeight + 1, width - ui.navWidth, height - ui.headerHeight - ui.statusHeight, colors.black, colors.white)
+
+    writeAt(ui.navWidth + 3, ui.headerHeight + 2, "Dashboard", colors.black, colors.white)
+    writeAt(ui.navWidth + 3, ui.headerHeight + 4, "Use left-side actions to manage players/cards.", colors.black, colors.lightGray)
+    writeAt(ui.navWidth + 3, ui.headerHeight + 5, "Ticket mode is disabled for current testing.", colors.black, colors.lightGray)
+    writeAt(ui.navWidth + 3, ui.headerHeight + 6, "Mouse clicks supported across all action buttons.", colors.black, colors.lightGray)
 
     for _, button in ipairs(buttons) do
         drawButton(button)
     end
 
-    term.setBackgroundColor(colors.black)
-    term.setTextColor(ui.isError and colors.red or colors.lime)
-    term.setCursorPos(2, height - 1)
-    term.write(string.rep(" ", math.max(1, width - 2)))
-    term.setCursorPos(2, height - 1)
-    term.write(string.sub(ui.message or "", 1, width - 3))
-
-    term.setTextColor(colors.lightGray)
-    term.setCursorPos(2, height)
-    term.write("Click a button. Keyboard: 1-7, 0 to exit")
+    fillRect(1, height - ui.statusHeight + 1, width, ui.statusHeight, colors.gray, colors.white)
+    writeAt(2, height - 2, clampText(ui.message or "", width - 3), colors.gray, ui.isError and colors.red or colors.lime)
+    writeAt(2, height - 1, "Click action buttons. Keyboard shortcuts: 1-7, 0 exit", colors.gray, colors.white)
 end
 
 local function boot()
