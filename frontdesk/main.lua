@@ -17,6 +17,7 @@ local state = {
     logs = {},
     message = "Ready",
     isError = false,
+    deleteUnlocked = false,
 }
 
 local buttons = {}
@@ -412,10 +413,13 @@ local function deleteCardAction()
         return
     end
 
-    local values = ask("Delete Card", { "Type DELETE to confirm" })
-    if values[1] ~= "DELETE" then
-        setMessage("Delete card cancelled", false)
-        return
+    if not state.deleteUnlocked then
+        local values = ask("Delete Unlock", { "Type DELETE to unlock for this session" })
+        if string.upper(values[1] or "") ~= "DELETE" then
+            setMessage("Delete unlock cancelled", false)
+            return
+        end
+        state.deleteUnlocked = true
     end
 
     local ok, data, err = send("card.delete", {
