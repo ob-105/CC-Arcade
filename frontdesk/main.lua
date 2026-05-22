@@ -55,6 +55,8 @@ local P = {
 local function txBadgeColor(txType)
     if txType == "award" or txType == "adjust" then return colors.lime    end
     if txType == "spend"                         then return colors.red    end
+    if txType == "credit_add"                    then return colors.lime   end
+    if txType == "credit_spend"                  then return colors.red    end
     if txType == "create"                        then return colors.cyan   end
     if txType == "rename" or txType == "link_card" then return colors.yellow end
     return colors.lightGray
@@ -381,7 +383,7 @@ local function loadCreditsAction()
         return
     end
 
-    local ok, data, err = send("tickets.add", {
+    local ok, data, err = send("credits.add", {
         playerId = player.playerId,
         amount = amount,
         note = "Front desk credit load",
@@ -391,11 +393,7 @@ local function loadCreditsAction()
         return
     end
 
-    if data and data.bypassed then
-        setMessage("Ticket mode disabled; credits unchanged", true)
-    else
-        setMessage("Loaded " .. tostring(amount) .. " credits to " .. player.displayName, false)
-    end
+    setMessage("Loaded " .. tostring(amount) .. " credits to " .. player.displayName, false)
     refreshAll()
 end
 
@@ -528,8 +526,9 @@ local function drawDetailsPanel(x, y, w, h)
     local fields = {
         { "Name",   player.displayName          },
         { "Card",   tostring(player.cardId or "none") },
-        { "ID",     player.playerId             },
-        { "Tickets","(disabled)"                },
+        { "Credits", tostring(player.credits or 0) },
+        { "Tickets", tostring(player.tickets or 0) },
+        { "ID",      player.playerId             },
     }
 
     for i, field in ipairs(fields) do

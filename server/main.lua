@@ -75,6 +75,26 @@ local function rebuildCardIndex()
     end
 end
 
+local function normalizePlayers()
+    local changed = false
+
+    for _, player in pairs(state.playersById) do
+        if type(player.credits) ~= "number" then
+            player.credits = 0
+            changed = true
+        end
+
+        if type(player.tickets) ~= "number" then
+            player.tickets = 0
+            changed = true
+        end
+    end
+
+    if changed then
+        persistPlayers()
+    end
+end
+
 local function persistPlayers()
     return saveTable(PLAYERS_DB_PATH, state.playersById)
 end
@@ -214,6 +234,7 @@ local function handlePlayerCreate(request)
     local player = {
         playerId = playerId,
         displayName = displayName,
+        credits = 0,
         tickets = 0,
         createdAt = now,
         updatedAt = now,
@@ -255,6 +276,7 @@ local function handlePlayerList(request)
             table.insert(items, {
                 playerId = player.playerId,
                 displayName = player.displayName,
+                credits = player.credits,
                 tickets = TICKET_MODE_ENABLED and player.tickets or 0,
                 cardId = player.cardId,
                 updatedAt = player.updatedAt,
@@ -321,6 +343,38 @@ local function handleLinkCard(request)
     return true, { player = player }
 end
 
+local function applyCreditsChange(request, txType, signedAmount)
+    local payload = request.payload or {}
+    local player = getPlayer(payload)
+    if not player then
+        return false, nil, "PLAYER_NOT_FOUND"
+    end
+
+    if not security.isPositiveInt(payload.amount) then
+        return false, nil, "INVALID_AMOUNT"
+    end
+
+    local amount = payload.amount * signedAmount
+    local newBalance = player.credits + amount
+    if newBalance < 0 then
+        return false, nil, "INSUFFICIENT_CREDITS"
+    end
+
+    player.credits = newBalance
+    player.updatedAt = os.epoch("utc")
+    persistPlayers()
+
+    local txAmount = amount
+    addTransaction(player.playerId, txType, txAmount, newBalance, request.machineId, request.role, payload.note)
+    pushLog(txType .. " " .. tostring(txAmount) .. " for " .. player.playerId .. " -> " .. tostring(newBalance))
+
+    return true, {
+        playerId = player.playerId,
+        balanceAfter = newBalance,
+        creditsAfter = newBalance,
+    }
+end
+
 local function applyTicketChange(request, txType, signedAmount)
     local payload = request.payload or {}
     local player = getPlayer(payload)
@@ -358,6 +412,7 @@ local function applyTicketChange(request, txType, signedAmount)
     return true, {
         playerId = player.playerId,
         balanceAfter = newBalance,
+        ticketsAfter = newBalance,
     }
 end
 
@@ -418,9 +473,14 @@ local function handleMessage(request)
         return true, {
             playerId = data.player.playerId,
             displayName = data.player.displayName,
+            credits = data.player.credits,
             tickets = TICKET_MODE_ENABLED and data.player.tickets or 0,
             cardId = data.player.cardId,
         }
+    end
+
+    if request.type == "credits.add" then
+        return applyCreditsChange(request, "credit_add", 1)
     end
 
     if request.type == "tickets.add" then
@@ -431,7 +491,11 @@ local function handleMessage(request)
         return applyTicketChange(request, "award", 1)
     end
 
-    if request.type == "tickets.spend" or request.type == "game.credit.take" then
+    if request.type == "game.credit.take" then
+        return applyCreditsChange(request, "credit_spend", -1)
+    end
+
+    if request.type == "tickets.spend" then
         return applyTicketChange(request, "spend", -1)
     end
 
@@ -511,6 +575,7 @@ local function boot()
     state.playersById = loadTable(PLAYERS_DB_PATH, {})
     state.transactions = loadTable(TX_DB_PATH, {})
     state.allowlist = loadTable(ALLOWLIST_PATH, {})
+    normalizePlayers()
     rebuildCardIndex()
 
     local opened = net.openWiredModems()

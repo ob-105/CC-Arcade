@@ -96,6 +96,7 @@ local function showByCard()
     end
 
     print("Player: " .. data.displayName)
+    print("Credits: " .. tostring(data.credits or 0))
     print("Tickets: " .. tostring(data.tickets))
 
     local txOk, txData = send("tx.listRecent", { playerId = data.playerId, limit = 5 })
@@ -118,6 +119,7 @@ local function showByPlayerId()
     end
 
     print("Player: " .. data.displayName)
+    print("Credits: " .. tostring(data.credits or 0))
     print("Tickets: " .. tostring(data.tickets))
 
     local txOk, txData = send("tx.listRecent", { playerId = data.playerId, limit = 5 })
