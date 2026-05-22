@@ -304,8 +304,18 @@ local function renamePlayerAction()
     refreshAll()
 end
 
+local function findActiveDriveSide()
+    for _, side in ipairs(peripheral.getNames()) do
+        if peripheral.getType(side) == "drive" and disk.isPresent(side) then
+            return side
+        end
+    end
+    return nil
+end
+
 local function issueCardAction()
-    if not fs.exists("/disk") then
+    local driveSide = findActiveDriveSide()
+    if not driveSide or not fs.exists("/disk") then
         setMessage("No floppy disk in drive", true)
         return
     end
@@ -321,7 +331,7 @@ local function issueCardAction()
     file.writeLine("version=1")
     file.writeLine("issuedAt=" .. tostring(os.epoch("utc")))
     file.close()
-    disk.setLabel("Arcade Card " .. string.sub(cardId, -4))
+    pcall(disk.setLabel, driveSide, "Arcade Card " .. string.sub(cardId, -4))
 
     setMessage("Issued card " .. cardId, false)
 end
@@ -349,6 +359,43 @@ local function linkCardAction()
     end
 
     setMessage("Linked card to " .. data.player.displayName, false)
+    refreshAll()
+end
+
+local function loadCreditsAction()
+    local player = currentPlayer()
+    if not player then
+        setMessage("No player selected", true)
+        return
+    end
+
+    local values = ask("Load Credits", { "Amount" })
+    if values[1] == "" then
+        setMessage("Load credits cancelled", false)
+        return
+    end
+
+    local amount = tonumber(values[1])
+    if not amount or amount <= 0 or amount ~= math.floor(amount) then
+        setMessage("Amount must be a positive whole number", true)
+        return
+    end
+
+    local ok, data, err = send("tickets.add", {
+        playerId = player.playerId,
+        amount = amount,
+        note = "Front desk credit load",
+    })
+    if not ok then
+        setMessage("Load credits failed: " .. tostring(err), true)
+        return
+    end
+
+    if data and data.bypassed then
+        setMessage("Ticket mode disabled; credits unchanged", true)
+    else
+        setMessage("Loaded " .. tostring(amount) .. " credits to " .. player.displayName, false)
+    end
     refreshAll()
 end
 
@@ -398,6 +445,7 @@ local function rebuildButtons()
         { key = "4", label = "IssueCard", action = issueCardAction,    bg = colors.yellow    },
         { key = "5", label = "LinkCard",  action = linkCardAction,     bg = colors.lime      },
         { key = "6", label = "Refresh",   action = refreshAction,      bg = colors.gray,  fg = colors.white },
+        { key = "7", label = "LoadCred",  action = loadCreditsAction,  bg = colors.purple, fg = colors.white },
         { key = "0", label = "Exit",      action = nil,                bg = colors.red,   fg = colors.white },
     }
 
