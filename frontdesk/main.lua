@@ -333,7 +333,7 @@ local function issueCardAction()
     file.writeLine("version=1")
     file.writeLine("issuedAt=" .. tostring(os.epoch("utc")))
     file.close()
-    pcall(disk.setLabel, driveSide, "Arcade Card " .. string.sub(cardId, -4))
+    pcall(disk.setLabel, driveSide, "Arcade Card")
 
     setMessage("Issued card " .. cardId, false)
 end
