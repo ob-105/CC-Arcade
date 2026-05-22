@@ -1,0 +1,138 @@
+# ComputerCraft Arcade MVP Setup
+
+Date: 2026-05-21
+
+This setup gives you a working minimum arcade system with:
+- Authoritative ticket server
+- Front desk admin terminal
+- Player balance checker kiosk
+- One demo game cabinet client
+
+## Project Files
+
+- `/shared/protocol.lua`
+- `/shared/security.lua`
+- `/shared/net.lua`
+- `/server/main.lua`
+- `/frontdesk/main.lua`
+- `/kiosk/main.lua`
+- `/game/main.lua`
+
+## 1) Wire the Network
+
+Use wired modems only.
+
+Recommended wiring:
+- Server computer on wired backbone
+- Front desk computer on wired backbone
+- Kiosk computer on wired backbone
+- Game client computer on wired backbone
+- Optional cabinet helper computers on game client's private local wired segment
+
+No wireless modems.
+
+## 2) Copy Files to Each Computer
+
+Every machine needs the `/shared` folder and its own role folder.
+
+Server machine:
+- `/shared/*`
+- `/server/main.lua`
+
+Front desk machine:
+- `/shared/*`
+- `/frontdesk/main.lua`
+
+Kiosk machine:
+- `/shared/*`
+- `/kiosk/main.lua`
+
+Game machine:
+- `/shared/*`
+- `/game/main.lua`
+
+## 3) Shared Token
+
+On every machine, create:
+- `/arcade_token.txt`
+
+Use the same single-line token string on all machines.
+
+Example:
+
+```text
+arcade-secret-001
+```
+
+## 4) Start Order
+
+1. Start server first:
+
+```lua
+shell.run("/server/main.lua")
+```
+
+2. Start front desk:
+
+```lua
+shell.run("/frontdesk/main.lua")
+```
+
+3. Start kiosk:
+
+```lua
+shell.run("/kiosk/main.lua")
+```
+
+4. Start game:
+
+```lua
+shell.run("/game/main.lua")
+```
+
+Clients auto-discover server using `ping`.
+
+## 5) Front Desk First-Time Flow
+
+At the front desk terminal:
+
+1. Create player
+2. Insert blank floppy disk
+3. Issue new card on disk
+4. Link inserted card to player
+5. Add tickets to player
+
+The card file is written to:
+- `/disk/arcade_card.txt`
+
+## 6) Kiosk Flow
+
+At kiosk terminal:
+
+- Insert player card disk and choose read card
+- Or lookup by playerId
+- View ticket balance and last transactions
+
+## 7) Game Flow
+
+At game terminal:
+
+- Insert linked player card disk
+- Start round (costs credits)
+- Game spends tickets for start and optional upgrades
+- Game awards tickets by score tier
+- Save data is kept on card at:
+  - `/disk/saves/demo_racer.txt`
+
+## 8) Server Data Files
+
+Server writes:
+- `/server/db/players.db`
+- `/server/db/transactions.db`
+- `/server/db/allowlist.db` (optional, empty means allow all)
+
+## 9) Notes
+
+- Tickets are authoritative on server only.
+- Card floppy is identity + game-specific save storage.
+- If you later add cabinet adapters, keep machine-to-server requests routed through the game client API.
