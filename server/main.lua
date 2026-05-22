@@ -17,6 +17,8 @@ local state = {
     recentLog = {},
 }
 
+local persistPlayers
+
 local function ensureDir(path)
     if not fs.exists(path) then
         fs.makeDir(path)
@@ -95,7 +97,7 @@ local function normalizePlayers()
     end
 end
 
-local function persistPlayers()
+function persistPlayers()
     return saveTable(PLAYERS_DB_PATH, state.playersById)
 end
 
