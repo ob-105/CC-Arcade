@@ -2,7 +2,7 @@ local CABINET_ID = "cabinet-test-01"
 local GAME_ID = "demo_racer"
 
 local config = {
-    modemSide = "right",
+    modemSide = "back",
     channel = 34001,
     replyChannel = 34002,
     startButtonSide = "front",

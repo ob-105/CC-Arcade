@@ -248,7 +248,7 @@ shell.run("/cabinet_test/main.lua")
 ```
 
 Default test script sides/channels:
-- Modem side: `right`
+- Modem side: `back`
 - Start button redstone side: `front`
 - Cabinet channel: `34001`
 - Reply channel: `34002`
