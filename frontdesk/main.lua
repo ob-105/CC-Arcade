@@ -335,7 +335,13 @@ local function issueCardAction()
     file.close()
     pcall(disk.setLabel, driveSide, "Arcade Card")
 
-    setMessage("Issued card " .. cardId, false)
+    local ok, _, err = send("player.lookup", { cardId = cardId })
+    if ok then
+        setMessage("Issued and registered card " .. cardId, false)
+        refreshAll()
+    else
+        setMessage("Issued card, but register failed: " .. tostring(err), true)
+    end
 end
 
 local function linkCardAction()
