@@ -12,7 +12,8 @@ This setup gives you a working minimum arcade system with:
 
 Current testing mode:
 - Ticket economy is temporarily disabled by default for easier bring-up.
-- Spend/award requests are accepted but bypassed while disabled.
+- Ticket spend/award requests are accepted but bypassed while disabled.
+- Credits remain active and are used for gameplay start/upgrade costs.
 
 ## Project Files
 
@@ -186,7 +187,7 @@ At the front desk terminal:
 2. Insert blank floppy disk
 3. Issue new card on disk
 4. Link inserted card to player
-5. Ticket actions are hidden while ticket mode is disabled
+5. Load credits to the selected player using the Load button
 
 The card file is written to:
 - `/disk/arcade_card.txt`
@@ -197,7 +198,7 @@ At kiosk terminal:
 
 - Insert player card disk and choose read card
 - Or lookup by playerId
-- View ticket balance and last transactions
+- View credits, ticket balance, and last transactions
 
 ## 7) Game Flow
 
@@ -205,8 +206,8 @@ At game terminal:
 
 - Insert linked player card disk
 - Start round when cabinet sends a start event over cabinet modem network
-- Game spends tickets for start and optional upgrades
-- Game awards tickets by score tier
+- Game spends credits for start and optional upgrades
+- Game awards tickets by score tier (awards are bypassed while ticket mode is disabled)
 - Save data is kept on card at:
   - `/top-drive-mount/saves/demo_racer.txt`
 
@@ -230,7 +231,7 @@ Server writes:
 
 ## 9) Notes
 
-- Tickets are authoritative on server only.
+- Credits and tickets are authoritative on server only.
 - Card floppy is identity + game-specific save storage.
 - If you later add cabinet adapters, keep machine-to-server requests routed through the game client API.
 
