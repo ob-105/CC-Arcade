@@ -221,3 +221,30 @@ Server writes:
 - Tickets are authoritative on server only.
 - Card floppy is identity + game-specific save storage.
 - If you later add cabinet adapters, keep machine-to-server requests routed through the game client API.
+
+## 10) Cabinet Test Game (Actual Arcade Machine)
+
+Use this when validating the local cabinet network before building a full cabinet game.
+
+Script:
+- `/cabinet_test/main.lua`
+
+What it does:
+- Connects to the cabinet local wired modem network
+- Sends `cabinet.start_pressed` events to arcade client
+- Displays client events (`client.player_ready`, `client.round_starting`, `client.round_complete`, etc.)
+- Supports keyboard and redstone start trigger
+
+Run on the actual cabinet machine:
+
+```lua
+shell.run("/cabinet_test/main.lua")
+```
+
+Default test script sides/channels:
+- Modem side: `right`
+- Start button redstone side: `front`
+- Cabinet channel: `34001`
+- Reply channel: `34002`
+
+If your cabinet hardware differs, edit those values at top of `/cabinet_test/main.lua`.
