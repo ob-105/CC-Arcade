@@ -339,37 +339,24 @@ local function issueCardAction()
 end
 
 local function linkCardAction()
-    local player = currentPlayer()
-    if not player then
-        setMessage("No player selected", true)
-        return
-    end
-
     local card = parseCardFile("/disk/arcade_card.txt")
     if not card then
         setMessage("No valid card file in /disk", true)
         return
     end
 
-    local ok, data, err = send("player.linkCard", {
-        playerId = player.playerId,
-        cardId = card.cardId,
-    })
+    local ok, data, err = send("player.lookup", { cardId = card.cardId })
     if not ok then
-        setMessage("Link failed: " .. tostring(err), true)
+        setMessage("Card account failed: " .. tostring(err), true)
         return
     end
 
-    setMessage("Linked card to " .. data.player.displayName, false)
+    setMessage("Card account ready: " .. data.player.displayName, false)
     refreshAll()
 end
 
 local function loadCreditsAction()
     local player = currentPlayer()
-    if not player then
-        setMessage("No player selected", true)
-        return
-    end
 
     local values = ask("Load Credits", { "Amount" })
     if values[1] == "" then
@@ -383,17 +370,32 @@ local function loadCreditsAction()
         return
     end
 
-    local ok, data, err = send("credits.add", {
-        playerId = player.playerId,
+    local payload = {
         amount = amount,
         note = "Front desk credit load",
-    })
+    }
+
+    local targetLabel
+    if player then
+        payload.playerId = player.playerId
+        targetLabel = player.displayName
+    else
+        local card = parseCardFile("/disk/arcade_card.txt")
+        if not card then
+            setMessage("Select a player or insert a card", true)
+            return
+        end
+        payload.cardId = card.cardId
+        targetLabel = "card " .. card.cardId
+    end
+
+    local ok, data, err = send("credits.add", payload)
     if not ok then
         setMessage("Load credits failed: " .. tostring(err), true)
         return
     end
 
-    setMessage("Loaded " .. tostring(amount) .. " credits to " .. player.displayName, false)
+    setMessage("Loaded " .. tostring(amount) .. " credits to " .. targetLabel, false)
     refreshAll()
 end
 
@@ -445,7 +447,7 @@ local function rebuildButtons()
         { key = "2", label = "Create",   action = createPlayerAction, bg = colors.lightBlue },
         { key = "3", label = "Rename",   action = renamePlayerAction, bg = colors.orange    },
         { key = "4", label = "Issue",    action = issueCardAction,    bg = colors.yellow    },
-        { key = "5", label = "Link",     action = linkCardAction,     bg = colors.lime      },
+        { key = "5", label = "Card",     action = linkCardAction,     bg = colors.lime      },
         { key = "6", label = "Refresh",  action = refreshAction,      bg = colors.gray,   fg = colors.white },
         { key = "7", label = "Load",     action = loadCreditsAction,  bg = colors.purple, fg = colors.white },
         { key = "0", label = "Exit",     action = nil,                bg = colors.red,    fg = colors.white },

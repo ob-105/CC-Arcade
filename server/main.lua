@@ -113,6 +113,14 @@ local function makePlayerId()
     return "player-" .. tostring(os.epoch("utc")) .. "-" .. tostring(math.random(100, 999))
 end
 
+local function makeCardPlayerId(cardId)
+    local cleaned = string.upper(string.gsub(tostring(cardId or ""), "[^%w]", ""))
+    if cleaned == "" then
+        cleaned = tostring(os.epoch("utc"))
+    end
+    return "card-" .. cleaned
+end
+
 local function getPlayer(payload)
     if not payload then
         return nil
@@ -137,6 +145,49 @@ local function getPlayer(payload)
     end
 
     return nil
+end
+
+local function createCardAccount(cardId, machineId, role)
+    if type(cardId) ~= "string" or cardId == "" then
+        return nil
+    end
+
+    local existingPlayerId = state.cardIndex[cardId]
+    if existingPlayerId and state.playersById[existingPlayerId] then
+        return state.playersById[existingPlayerId]
+    end
+
+    local baseId = makeCardPlayerId(cardId)
+    local playerId = baseId
+    local suffix = 1
+    while state.playersById[playerId] and state.playersById[playerId].cardId ~= cardId do
+        playerId = baseId .. "-" .. tostring(suffix)
+        suffix = suffix + 1
+    end
+
+    local now = os.epoch("utc")
+    local cardLabel = string.sub(string.upper(string.gsub(cardId, "[^%w]", "")), -6)
+    if cardLabel == "" then
+        cardLabel = "UNSET"
+    end
+
+    local player = {
+        playerId = playerId,
+        displayName = "Card " .. cardLabel,
+        credits = 0,
+        tickets = 0,
+        createdAt = now,
+        updatedAt = now,
+        cardId = cardId,
+    }
+
+    state.playersById[playerId] = player
+    state.cardIndex[cardId] = playerId
+    persistPlayers()
+    addTransaction(playerId, "card_account_create", 0, player.credits, machineId or "system", role or "system", cardId)
+    pushLog("Created card account " .. playerId .. " for " .. cardId)
+
+    return player
 end
 
 local function addTransaction(playerId, txType, amount, balanceAfter, sourceMachineId, sourceRole, note)
@@ -252,7 +303,11 @@ local function handlePlayerCreate(request)
 end
 
 local function handlePlayerLookup(request)
-    local player = getPlayer(request.payload)
+    local payload = request.payload or {}
+    local player = getPlayer(payload)
+    if not player and payload.cardId then
+        player = createCardAccount(payload.cardId, request.machineId, request.role)
+    end
     if not player then
         return false, nil, "PLAYER_NOT_FOUND"
     end
@@ -348,6 +403,9 @@ end
 local function applyCreditsChange(request, txType, signedAmount)
     local payload = request.payload or {}
     local player = getPlayer(payload)
+    if not player and payload.cardId then
+        player = createCardAccount(payload.cardId, request.machineId, request.role)
+    end
     if not player then
         return false, nil, "PLAYER_NOT_FOUND"
     end
@@ -380,6 +438,9 @@ end
 local function applyTicketChange(request, txType, signedAmount)
     local payload = request.payload or {}
     local player = getPlayer(payload)
+    if not player and payload.cardId then
+        player = createCardAccount(payload.cardId, request.machineId, request.role)
+    end
     if not player then
         return false, nil, "PLAYER_NOT_FOUND"
     end

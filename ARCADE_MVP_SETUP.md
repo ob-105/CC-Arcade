@@ -10,6 +10,10 @@ This setup gives you a working minimum arcade system with:
 - One-click role installer that writes startup
 - Boot-time auto-updating from GitHub
 
+Card ownership model:
+- Credits and tickets are owned by the card account (cardId), not by a separate linked user identity.
+- If a card is lost, its balances stay with that card; anyone who inserts that card can use them.
+
 Current testing mode:
 - Ticket economy is temporarily disabled by default for easier bring-up.
 - Ticket spend/award requests are accepted but bypassed while disabled.
@@ -186,8 +190,8 @@ At the front desk terminal:
 1. Create player
 2. Insert blank floppy disk
 3. Issue new card on disk
-4. Link inserted card to player
-5. Load credits to the selected player using the Load button
+4. Press Card to register/use that card account
+5. Load credits to selected player or directly from inserted card
 
 The card file is written to:
 - `/disk/arcade_card.txt`
